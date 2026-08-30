@@ -55,14 +55,14 @@ worker safely processes them, records useful results, and retries only suitable 
 
 ## Phase 4 — React application
 
-- [ ] Configure React, TypeScript, Vite, Router, TanStack Query, forms, Zod, Tailwind, and tests.
-- [ ] Implement authentication pages and guarded application shell.
-- [ ] Implement live dashboard, workflow list/form/detail, token controls, and cURL example.
-- [ ] Implement execution filtering, pagination, detail view, JSON viewer, and retry interaction.
-- [ ] Add loading, empty, error, not-found, responsive, and keyboard-accessible states.
-- [ ] Add meaningful unit/component coverage.
-- [ ] Run frontend lint, formatting, type, unit, and production-build checks.
-- [ ] Inspect and commit the phase.
+- [x] Configure React, TypeScript, Vite, Router, TanStack Query, forms, Zod, Tailwind, and tests.
+- [x] Implement authentication pages and guarded application shell.
+- [x] Implement live dashboard, workflow list/form/detail, token controls, and cURL example.
+- [x] Implement execution filtering, pagination, detail view, JSON viewer, and retry interaction.
+- [x] Add loading, empty, error, not-found, responsive, and keyboard-accessible states.
+- [x] Add meaningful unit/component coverage.
+- [x] Run frontend lint, formatting, type, unit, and production-build checks.
+- [x] Inspect and commit the phase.
 
 Acceptance criteria: the English UI is responsive and all required pages operate
 against the real API without static dashboard data or unsafe HTML rendering.
