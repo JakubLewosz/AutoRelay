@@ -1,0 +1,113 @@
+name: autorelay
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-autorelay}"
+      POSTGRES_USER: "${POSTGRES_USER:-autorelay}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Run python3 scripts/bootstrap_env.py first}"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    init: true
+    command:
+      - sh
+      - -c
+      - >-
+        alembic upgrade head && exec uvicorn app.main:app
+        --host 0.0.0.0 --port 8000 --no-access-log
+    environment: &backend-environment
+      APP_ENV: "${APP_ENV:-development}"
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-autorelay}:${POSTGRES_PASSWORD:?Run python3 scripts/bootstrap_env.py first}@postgres:5432/${POSTGRES_DB:-autorelay}"
+      FERNET_KEY: "${FERNET_KEY:?Run python3 scripts/bootstrap_env.py first}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+      SESSION_TTL_HOURS: "${SESSION_TTL_HOURS:-168}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8080}"
+      ALLOW_PRIVATE_ACTION_TARGETS: "${ALLOW_PRIVATE_ACTION_TARGETS:-false}"
+      WEBHOOK_MAX_PAYLOAD_BYTES: "${WEBHOOK_MAX_PAYLOAD_BYTES:-65536}"
+      ACTION_TIMEOUT_SECONDS: "${ACTION_TIMEOUT_SECONDS:-10}"
+      WORKER_POLL_INTERVAL_SECONDS: "${WORKER_POLL_INTERVAL_SECONDS:-1}"
+      WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-4}"
+      WORKER_MAX_ATTEMPTS: "${WORKER_MAX_ATTEMPTS:-3}"
+      WORKER_STALE_AFTER_SECONDS: "${WORKER_STALE_AFTER_SECONDS:-300}"
+      WORKER_RETRY_BASE_SECONDS: "${WORKER_RETRY_BASE_SECONDS:-2}"
+      WORKER_RETRY_MAX_SECONDS: "${WORKER_RETRY_MAX_SECONDS:-60}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=2).read()
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 30s
+
+  worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    init: true
+    command:
+      - python
+      - -m
+      - app.worker.main
+    environment: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    # Allow an in-flight action (maximum 30 seconds) to persist its final state
+    # before Docker sends SIGKILL.
+    stop_grace_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://127.0.0.1/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres_data:
