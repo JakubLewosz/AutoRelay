@@ -257,7 +257,13 @@ npm run test:e2e
 Backend integration tests require a reachable PostgreSQL database. The GitHub
 Actions workflow provisions an isolated PostgreSQL service and runs the same
 format, lint, type, test, build, browser, and container validation commands.
-The presence of that workflow is not a claim that a remote run has completed.
+The GitHub Actions workflow validates backend quality and PostgreSQL integration 
+tests, frontend quality and production build checks, browser tests, Docker image builds, 
+and the Docker Compose configuration.
+
+Backend integration tests run against a real PostgreSQL service in CI. The Playwright 
+suite validates the browser workflow with controlled API responses; it is not a full 
+browser-to-worker end-to-end test of the complete stack.
 
 ## API
 
