@@ -17,38 +17,38 @@ and records the chosen architecture and implementation phases.
 
 ## Phase 1 — Backend foundation and authentication
 
-- [ ] Configure FastAPI, Pydantic Settings, SQLAlchemy, Alembic, Ruff, mypy, and pytest.
-- [ ] Add PostgreSQL models and the initial complete-schema migration.
-- [ ] Add structured errors, request IDs, restricted CORS, and health/readiness routes.
-- [ ] Implement registration, login, current-user, logout, database sessions, and CSRF.
-- [ ] Test password hashing, session expiration, authentication, and CSRF behavior.
-- [ ] Run backend format, lint, type, and focused test checks.
-- [ ] Inspect and commit the phase.
+- [x] Configure FastAPI, Pydantic Settings, SQLAlchemy, Alembic, Ruff, mypy, and pytest.
+- [x] Add PostgreSQL models and the initial complete-schema migration.
+- [x] Add structured errors, request IDs, restricted CORS, and health/readiness routes.
+- [x] Implement registration, login, current-user, logout, database sessions, and CSRF.
+- [x] Test password hashing, session expiration, authentication, and CSRF behavior.
+- [x] Run backend format, lint, type, and focused test checks.
+- [x] Inspect and commit the phase.
 
 Acceptance criteria: users can register, log in, remain authenticated by an
 HttpOnly database-backed cookie, and log out; authenticated mutations require CSRF.
 
 ## Phase 2 — Workflows and owner API
 
-- [ ] Add workflow, condition, and action services with ownership isolation.
-- [ ] Encrypt action secrets and recoverable webhook tokens; hash webhook verification values.
-- [ ] Implement workflow CRUD, activation/deactivation, test event, and token rotation.
-- [ ] Validate condition and action configuration without exposing stored secrets.
-- [ ] Test CRUD, ownership, redaction, encryption, enable/disable, and rotation.
-- [ ] Run checks, inspect the diff, and commit the phase.
+- [x] Add workflow, condition, and action services with ownership isolation.
+- [x] Encrypt action secrets and recoverable webhook tokens; hash webhook verification values.
+- [x] Implement workflow CRUD, activation/deactivation, test event, and token rotation.
+- [x] Validate condition and action configuration without exposing stored secrets.
+- [x] Test CRUD, ownership, redaction, encryption, enable/disable, and rotation.
+- [x] Run checks, inspect the diff, and commit the phase.
 
 Acceptance criteria: each user can manage only their own workflows, with zero
 or one safe condition, exactly one supported action, and immediately revocable webhook URLs.
 
 ## Phase 3 — Webhooks, queue, worker, and actions
 
-- [ ] Add JSON-only, size-limited public webhook ingestion returning HTTP 202.
-- [ ] Add safe condition evaluation and PostgreSQL `SKIP LOCKED` claiming.
-- [ ] Add HTTP POST and Discord action execution with SSRF validation and redaction.
-- [ ] Add automatic bounded retries, stale-run recovery, graceful shutdown, and manual retry.
-- [ ] Add execution list/detail APIs with ownership, filtering, and pagination.
-- [ ] Test token validation, conditions, action outcomes, SSRF, claiming, retry, and recovery.
-- [ ] Run checks, inspect the diff, and commit the phase.
+- [x] Add JSON-only, size-limited public webhook ingestion returning HTTP 202.
+- [x] Add safe condition evaluation and PostgreSQL `SKIP LOCKED` claiming.
+- [x] Add HTTP POST and Discord action execution with SSRF validation and redaction.
+- [x] Add automatic bounded retries, stale-run recovery, graceful shutdown, and manual retry.
+- [x] Add execution list/detail APIs with ownership, filtering, and pagination.
+- [x] Test token validation, conditions, action outcomes, SSRF, claiming, retry, and recovery.
+- [x] Run checks, inspect the diff, and commit the phase.
 
 Acceptance criteria: webhook requests queue durable executions; the separate
 worker safely processes them, records useful results, and retries only suitable failures.
