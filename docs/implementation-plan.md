@@ -69,26 +69,26 @@ against the real API without static dashboard data or unsafe HTML rendering.
 
 ## Phase 5 — Containers, CI, and end-to-end coverage
 
-- [ ] Add backend and Nginx frontend Docker images plus four-service Compose setup.
-- [ ] Run migrations before the API serves and add health-aware dependencies.
-- [ ] Add safe environment bootstrap and sample-event scripts.
-- [ ] Add least-privilege GitHub Actions jobs for backend, frontend, and containers.
-- [ ] Add deterministic Playwright happy-path coverage.
-- [ ] Validate image builds and `docker compose config`.
-- [ ] Run Compose from an empty database and verify health endpoints.
-- [ ] Inspect and commit the phase.
+- [x] Add backend and Nginx frontend Docker images plus four-service Compose setup.
+- [x] Run migrations before the API serves and add health-aware dependencies.
+- [x] Add safe environment bootstrap and sample-event scripts.
+- [x] Add least-privilege GitHub Actions jobs for backend, frontend, and containers.
+- [x] Add deterministic Playwright happy-path coverage.
+- [x] Validate image builds and `docker compose config`.
+- [x] Run Compose from an empty database and verify health endpoints.
+- [x] Inspect and commit the phase.
 
 Acceptance criteria: `docker compose up --build` exposes the complete application
 at `http://localhost:8080`, with PostgreSQL persistence, API, worker, and frontend.
 
 ## Phase 6 — Documentation, screenshots, and final verification
 
-- [ ] Complete README, security guide, roadmap, and portfolio entry in English.
-- [ ] Execute the full demo scenario, including skip, failure/retry, isolation, and rotation.
-- [ ] Capture non-sensitive screenshots from the working application when possible.
-- [ ] Run all backend, frontend, browser, migration, container, diff, link, and secret checks.
-- [ ] Review tracked files and final Git history; commit documentation.
-- [ ] Create the public GitHub repository only if CLI access and all checks permit it.
+- [x] Complete README, security guide, roadmap, and portfolio entry in English.
+- [x] Execute the full demo scenario, including skip, failure/retry, isolation, and rotation.
+- [x] Capture non-sensitive screenshots from the working application.
+- [x] Run all backend, frontend, browser, migration, container, diff, link, and secret checks.
+- [x] Review tracked files and final Git history; commit documentation.
+- [x] Confirm GitHub CLI is unavailable and defer remote creation to the documented manual handoff.
 
 Acceptance criteria: documentation matches observed behavior, core-MVP items are
 complete, no secrets are tracked, and the final report distinguishes verified facts from limitations.

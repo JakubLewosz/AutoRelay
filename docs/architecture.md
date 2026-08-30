@@ -52,8 +52,10 @@ flowchart LR
 ### Outbound networking
 
 - Only HTTP(S) URLs without embedded credentials are accepted.
-- Host resolution blocks loopback, private, link-local, multicast, reserved, and
-  unspecified addresses unless the explicit development/test override is enabled.
+- Host resolution blocks non-global addresses by default. The explicit
+  development/test override permits only loopback, RFC 1918, and IPv6 ULA
+  targets; link-local, multicast, reserved, unspecified, and CGNAT addresses
+  remain blocked.
 - Redirects are disabled and timeouts are bounded. DNS can still change between
   validation and connection; this remaining rebinding risk is documented.
 
