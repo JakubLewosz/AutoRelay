@@ -1,5 +1,6 @@
 # AutoRelay
 [![CI](https://github.com/JakubLewosz/AutoRelay/actions/workflows/ci.yml/badge.svg)](https://github.com/JakubLewosz/AutoRelay/actions/workflows/ci.yml)
+
 Webhook-driven automation platform with conditional rules, PostgreSQL
 execution history, background processing, and retryable HTTP and Discord
 actions.
