@@ -1,6 +1,7 @@
 import type { ApiErrorPayload } from "../types/api";
 
 let csrfToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -20,6 +21,10 @@ export function setCsrfToken(token: string | null) {
   csrfToken = token;
 }
 
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 function errorMessage(payload: ApiErrorPayload | null, fallback: string): string {
   if (payload?.error?.message) return payload.error.message;
   if (typeof payload?.detail === "string") return payload.detail;
@@ -35,6 +40,32 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   csrf?: boolean;
 };
 
+function serializeBody(body: unknown): string {
+  try {
+    const serialized = JSON.stringify(body, (_key, value: unknown) => {
+      if (typeof value === "number" && !Number.isFinite(value)) {
+        throw new ApiError(
+          "Request data contains a number outside the supported finite range.",
+          400,
+          "invalid_client_payload",
+        );
+      }
+      return value;
+    });
+    if (serialized === undefined) {
+      throw new ApiError(
+        "Request data could not be encoded as JSON.",
+        400,
+        "invalid_client_payload",
+      );
+    }
+    return serialized;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError("Request data could not be encoded as JSON.", 400, "invalid_client_payload");
+  }
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
@@ -44,13 +75,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.set("X-CSRF-Token", csrfToken);
   }
 
+  const body = options.body === undefined ? undefined : serializeBody(options.body);
+
   let response: Response;
   try {
     response = await fetch(`/api/v1${path}`, {
       ...options,
       credentials: "include",
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body,
     });
   } catch {
     throw new ApiError(
@@ -65,6 +98,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       payload = (await response.json()) as ApiErrorPayload;
     } catch {
       // The response may intentionally have no JSON body.
+    }
+    if (
+      response.status === 401 ||
+      (response.status === 403 && payload?.error?.code === "account_disabled")
+    ) {
+      unauthorizedHandler?.();
     }
     throw new ApiError(
       errorMessage(payload, `Request failed with status ${response.status}.`),

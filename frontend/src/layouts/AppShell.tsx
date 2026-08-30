@@ -49,9 +49,11 @@ export function AppShell() {
     setIsLoggingOut(true);
     try {
       await logout();
-      void navigate("/login", { replace: true });
+    } catch {
+      // Local session state is cleared even if the server cannot complete logout.
     } finally {
       setIsLoggingOut(false);
+      void navigate("/login", { replace: true });
     }
   };
 

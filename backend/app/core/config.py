@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -9,15 +10,28 @@ from pydantic import AliasChoices, Field, SecretStr, field_validator, model_vali
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
+def repository_environment_file() -> Path | None:
+    """Return the repository-local dotenv path without consulting the process CWD."""
+
+    backend_root = Path(__file__).resolve().parents[2]
+    repository_root = backend_root.parent
+    if not (
+        (backend_root / "pyproject.toml").is_file()
+        and (repository_root / "docker-compose.yml").is_file()
+    ):
+        return None
+    return repository_root / ".env"
+
+
 class Settings(BaseSettings):
     """Runtime settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
         populate_by_name=True,
+        hide_input_in_errors=True,
     )
 
     environment: Literal["development", "test", "production"] = Field(
@@ -58,6 +72,10 @@ class Settings(BaseSettings):
         normalized: list[str] = []
         for origin in value:
             parsed = urlsplit(origin)
+            try:
+                _ = parsed.port
+            except ValueError as exc:
+                raise ValueError("CORS_ORIGINS must contain explicit HTTP(S) origins") from exc
             if (
                 origin == "*"
                 or parsed.scheme not in {"http", "https"}
@@ -82,16 +100,33 @@ class Settings(BaseSettings):
     @field_validator("public_base_url")
     @classmethod
     def normalize_public_base_url(cls, value: str) -> str:
-        if not value.startswith(("http://", "https://")):
-            raise ValueError("PUBLIC_BASE_URL must use http or https")
+        parsed = urlsplit(value)
+        try:
+            _ = parsed.port
+        except ValueError as exc:
+            raise ValueError("PUBLIC_BASE_URL must be an explicit HTTP(S) origin") from exc
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("PUBLIC_BASE_URL must be an explicit HTTP(S) origin")
         return value.rstrip("/")
 
     @model_validator(mode="after")
     def prevent_private_targets_in_production(self) -> Settings:
+        if self.environment != "test" and self.database_url.startswith("sqlite+aiosqlite://"):
+            raise ValueError("SQLite is supported only when APP_ENV=test; PostgreSQL is required")
         if self.environment == "production" and self.allow_private_action_targets:
             raise ValueError("private action targets cannot be enabled in production")
         if self.environment == "production" and not self.session_cookie_secure:
             raise ValueError("SESSION_COOKIE_SECURE must be enabled in production")
+        if self.environment == "production" and not self.public_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_BASE_URL must use HTTPS in production")
         try:
             Fernet(self.fernet_key.get_secret_value().encode("ascii"))
         except (ValueError, UnicodeEncodeError) as exc:
@@ -101,4 +136,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def load_settings() -> Settings:
-    return Settings()
+    return Settings(_env_file=repository_environment_file())

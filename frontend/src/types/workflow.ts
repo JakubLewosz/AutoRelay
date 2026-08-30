@@ -48,6 +48,17 @@ export type Workflow = {
   updated_at: string;
 };
 
+export type WorkflowSummary = {
+  id: string;
+  name: string;
+  description: string;
+  is_enabled: boolean;
+  condition: WorkflowCondition | null;
+  action: Pick<WorkflowAction, "action_type">;
+  created_at: string;
+  updated_at: string;
+};
+
 export type HttpPostActionConfig = {
   target_url: string;
   headers?: Record<string, string>;

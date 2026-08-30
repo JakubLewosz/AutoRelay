@@ -22,6 +22,17 @@ const workflow = {
   updated_at: timestamp,
 };
 
+const workflowSummary = {
+  id: workflow.id,
+  name: workflow.name,
+  description: workflow.description,
+  is_enabled: workflow.is_enabled,
+  condition: workflow.condition,
+  action: { action_type: workflow.action.action_type },
+  created_at: workflow.created_at,
+  updated_at: workflow.updated_at,
+};
+
 const execution = {
   id: "execution-1",
   workflow_id: workflow.id,
@@ -41,6 +52,24 @@ const execution = {
   duration_ms: 83,
   created_at: timestamp,
   updated_at: timestamp,
+};
+
+const executionSummary = {
+  id: execution.id,
+  workflow_id: execution.workflow_id,
+  workflow_name: execution.workflow_name,
+  status: execution.status,
+  trigger_type: execution.trigger_type,
+  attempt_count: execution.attempt_count,
+  max_attempts: execution.max_attempts,
+  next_attempt_at: execution.next_attempt_at,
+  queued_at: execution.queued_at,
+  started_at: execution.started_at,
+  completed_at: execution.completed_at,
+  duration_ms: execution.duration_ms,
+  created_at: execution.created_at,
+  updated_at: execution.updated_at,
+  retry_of_execution_id: null,
 };
 
 const pageResponse = <T>(items: T[]) => ({
@@ -78,7 +107,7 @@ async function apiMock(route: Route) {
       executions_last_24_hours: 1,
       succeeded_executions: 1,
       failed_executions: 0,
-      recent_executions: [execution],
+      recent_executions: [executionSummary],
     });
   }
   if (path.endsWith("/workflows") && request.method() === "POST") {
@@ -89,10 +118,10 @@ async function apiMock(route: Route) {
     return json(workflow, 201);
   }
   if (path.endsWith("/workflows") && request.method() === "GET") {
-    return json({ ...pageResponse([workflow]), page_size: 100 });
+    return json({ ...pageResponse([workflowSummary]), page_size: 100 });
   }
   if (path.endsWith(`/workflows/${workflow.id}`)) return json(workflow);
-  if (path.endsWith("/executions")) return json(pageResponse([execution]));
+  if (path.endsWith("/executions")) return json(pageResponse([executionSummary]));
   return json({ error: { message: `Unhandled test request: ${path}` } }, 500);
 }
 
@@ -133,4 +162,22 @@ test("login, create a workflow, inspect its webhook, and view execution history"
   await page.getByRole("link", { name: "Executions", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Execution history" })).toBeVisible();
   await expect(page.getByRole("row", { name: /succeeded High-value lead/ })).toBeVisible();
+});
+
+test("mobile navigation opens and reaches the workflow list", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/v1/**", apiMock);
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill("demo@example.com");
+  await page.getByLabel("Password").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+  await expect(page.locator("aside").first()).toBeHidden();
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(page.locator("aside").last()).toBeVisible();
+  await page.getByRole("link", { name: "Workflows", exact: true }).last().click();
+
+  await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
 });

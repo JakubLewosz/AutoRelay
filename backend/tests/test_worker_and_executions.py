@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
 import logging
 from datetime import timedelta
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -13,6 +14,7 @@ import respx
 from app.db.base import utc_now
 from app.models.enums import ExecutionStatus
 from app.models.execution import Execution
+from app.services.actions import execute_action
 from app.services.queue import (
     claim_executions,
     configure_worker_logging,
@@ -103,6 +105,46 @@ async def test_worker_suppresses_secret_bearing_http_client_logs(
     configure_worker_logging(context.settings)
     assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
     assert logging.getLogger("httpcore").getEffectiveLevel() >= logging.WARNING
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_discord_action_disables_mentions(context: BackendTestContext) -> None:
+    webhook_url = "https://discord.com/api/webhooks/123456/secret-token"
+    target = respx.post(webhook_url).mock(return_value=httpx.Response(204))
+    result = await execute_action(
+        "DISCORD_WEBHOOK",
+        {"webhook_url": webhook_url, "message_template": "Alert: {{ message }}"},
+        {"message": "@everyone @here"},
+        uuid4(),
+        context.settings,
+    )
+    assert result.succeeded
+    sent = json.loads(target.calls.last.request.content)
+    assert sent["content"] == "Alert: @everyone @here"
+    assert sent["allowed_mentions"] == {"parse": []}
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_action_caps_raw_compressed_response_without_decompression(
+    context: BackendTestContext,
+) -> None:
+    compressed = gzip.compress(b"x" * 1_000_000)
+    target = respx.post("https://8.8.8.8/compressed").mock(
+        return_value=httpx.Response(200, content=compressed, headers={"Content-Encoding": "gzip"})
+    )
+    result = await execute_action(
+        "HTTP_POST",
+        {"target_url": "https://8.8.8.8/compressed"},
+        {"event": "test"},
+        uuid4(),
+        context.settings,
+    )
+    assert result.succeeded
+    assert target.calls.last.request.headers["Accept-Encoding"] == "identity"
+    assert result.safe_result["response_bytes"] == len(compressed)
+    assert result.safe_result["response_truncated"] is False
 
 
 @pytest.mark.asyncio

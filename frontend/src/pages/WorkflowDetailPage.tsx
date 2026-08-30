@@ -31,6 +31,9 @@ export function WorkflowDetailPage() {
     queryKey: ["workflow", workflowId],
     queryFn: () => workflowsApi.get(workflowId),
     enabled: Boolean(workflowId),
+    // The detail response carries the capability URL, so discard it as soon as
+    // the owner leaves this screen instead of retaining it in the shared cache.
+    gcTime: 0,
   });
   const executionsQuery = useQuery({
     queryKey: ["executions", { workflow_id: workflowId, page: 1, page_size: 10 }],
@@ -72,9 +75,16 @@ export function WorkflowDetailPage() {
   const actionConfig = workflow.action.safe_display_config ?? workflow.action.config ?? {};
   const locationState = location.state as { justCreated?: boolean; updated?: boolean } | null;
   const curl = [
-    `curl --request POST '${workflow.webhook_url}' \\`,
-    "  --header 'Content-Type: application/json' \\",
-    `  --data '${JSON.stringify({ lead: { name: "Example Company", value: 1500 } })}'`,
+    "printf 'Webhook URL: '",
+    "read -r -s AUTORELAY_WEBHOOK_URL",
+    "printf '\\n'",
+    "curl --config - <<EOF",
+    'url = "$AUTORELAY_WEBHOOK_URL"',
+    'request = "POST"',
+    'header = "Content-Type: application/json"',
+    'data = "{\\"lead\\":{\\"name\\":\\"Example Company\\",\\"value\\":1500}}"',
+    "EOF",
+    "unset AUTORELAY_WEBHOOK_URL",
   ].join("\n");
 
   const runAction = async (operation: () => Promise<unknown>, success: string) => {
@@ -96,7 +106,15 @@ export function WorkflowDetailPage() {
       return;
     await runAction(async () => {
       await deleteMutation.mutateAsync();
-      void navigate("/workflows", { replace: true });
+      const detailQuery = { queryKey: ["workflow", workflowId], exact: true } as const;
+      await queryClient.cancelQueries(detailQuery);
+      void navigate("/workflows", { replace: true, flushSync: true });
+      queryClient.removeQueries(detailQuery);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["workflows"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["executions"] }),
+      ]);
     }, "Workflow deleted.");
   };
   const rotate = async () => {

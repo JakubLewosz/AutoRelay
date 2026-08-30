@@ -1,10 +1,32 @@
 import type { PaginatedResponse } from "../types/api";
-import type { Workflow, WorkflowInput, WorkflowTestResponse } from "../types/workflow";
+import type {
+  Workflow,
+  WorkflowInput,
+  WorkflowSummary,
+  WorkflowTestResponse,
+} from "../types/workflow";
 import { apiRequest, toSearchParams } from "./client";
 
+const listWorkflows = (params: { page?: number; page_size?: number } = {}) =>
+  apiRequest<PaginatedResponse<WorkflowSummary>>(`/workflows${toSearchParams(params)}`);
+
+async function listWorkflowOptions({
+  pageSize = 100,
+  maxPages = 20,
+}: { pageSize?: number; maxPages?: number } = {}) {
+  const pageLimit = Math.max(1, maxPages);
+  const firstPage = await listWorkflows({ page: 1, page_size: pageSize });
+  const items = [...firstPage.items];
+  for (let page = 2; page <= Math.min(firstPage.pages, pageLimit); page += 1) {
+    const response = await listWorkflows({ page, page_size: pageSize });
+    items.push(...response.items);
+  }
+  return { items, truncated: firstPage.pages > pageLimit };
+}
+
 export const workflowsApi = {
-  list: (params: { page?: number; page_size?: number } = {}) =>
-    apiRequest<PaginatedResponse<Workflow>>(`/workflows${toSearchParams(params)}`),
+  list: listWorkflows,
+  listOptions: listWorkflowOptions,
   get: (id: string) => apiRequest<Workflow>(`/workflows/${id}`),
   create: (input: WorkflowInput) =>
     apiRequest<Workflow>("/workflows", { method: "POST", body: input, csrf: true }),

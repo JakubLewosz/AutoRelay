@@ -11,12 +11,13 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.core.errors import AppError
+from app.core.json_values import (
+    parse_finite_json_float,
+    reject_json_constant,
+    validate_jsonb_value,
+)
 from app.core.security import secrets_match
 from app.models.workflow import Workflow
-
-
-def _reject_nonstandard_number(value: str) -> None:
-    raise ValueError(f"Non-standard JSON number {value!r} is not accepted")
 
 
 async def read_json_object(request: Request, max_bytes: int) -> dict[str, Any]:
@@ -42,8 +43,13 @@ async def read_json_object(request: Request, max_bytes: int) -> dict[str, Any]:
             raise AppError(413, "payload_too_large", "The webhook payload is too large.")
         chunks.append(chunk)
     try:
-        payload = json.loads(b"".join(chunks), parse_constant=_reject_nonstandard_number)
-    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        payload = json.loads(
+            b"".join(chunks),
+            parse_constant=reject_json_constant,
+            parse_float=parse_finite_json_float,
+        )
+        validate_jsonb_value(payload)
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
         raise AppError(400, "invalid_json", "The webhook body is not valid JSON.") from exc
     if not isinstance(payload, dict):
         raise AppError(422, "json_object_required", "The webhook payload must be a JSON object.")
@@ -57,6 +63,7 @@ async def authenticate_webhook(
         select(Workflow)
         .options(selectinload(Workflow.condition), selectinload(Workflow.action))
         .where(Workflow.id == workflow_id)
+        .with_for_update()
     )
     if workflow is None or not secrets_match(raw_token, workflow.webhook_token_hash):
         raise AppError(404, "webhook_not_found", "The webhook endpoint was not found.")
@@ -67,6 +74,7 @@ async def authenticate_webhook(
 
 def ensure_test_payload_size(payload: dict[str, Any], settings: Settings) -> None:
     try:
+        validate_jsonb_value(payload)
         serialized = json.dumps(
             payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False
         ).encode("utf-8")

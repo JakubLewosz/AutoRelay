@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Plus, Webhook, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { dashboardApi } from "../api/dashboard";
-import { workflowsApi } from "../api/workflows";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -12,31 +11,21 @@ import { useAuth } from "../features/auth/AuthProvider";
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const workflows = useQuery({
-    queryKey: ["workflows", { page: 1, page_size: 100 }],
-    queryFn: () => workflowsApi.list({ page: 1, page_size: 100 }),
-  });
   const dashboard = useQuery({ queryKey: ["dashboard"], queryFn: dashboardApi.get });
 
-  if (workflows.isPending || dashboard.isPending)
-    return <LoadingScreen label="Loading your dashboard" />;
-  const error = workflows.error ?? dashboard.error;
+  if (dashboard.isPending) return <LoadingScreen label="Loading your dashboard" />;
+  const error = dashboard.error;
   if (error)
     return (
       <ErrorState
         error={error}
         onRetry={() => {
-          void workflows.refetch();
           void dashboard.refetch();
         }}
       />
     );
 
-  const workflowItems = workflows.data?.items ?? [];
   const recentItems = dashboard.data?.recent_executions ?? [];
-  const workflowNames = Object.fromEntries(
-    workflowItems.map((workflow) => [workflow.id, workflow.name]),
-  );
   const firstName = user?.email.split("@")[0] ?? "there";
 
   const stats = [
@@ -112,7 +101,7 @@ export function DashboardPage() {
         </div>
         {recentItems.length ? (
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/45">
-            <ExecutionTable executions={recentItems.slice(0, 6)} workflowNames={workflowNames} />
+            <ExecutionTable executions={recentItems.slice(0, 6)} />
           </div>
         ) : (
           <EmptyState

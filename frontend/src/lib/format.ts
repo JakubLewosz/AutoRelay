@@ -2,7 +2,7 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -12,7 +12,7 @@ export function formatRelativeTime(value: string): string {
   const timestamp = new Date(value).getTime();
   if (Number.isNaN(timestamp)) return "Unknown time";
   const seconds = Math.round((timestamp - Date.now()) / 1000);
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const formatter = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
   if (Math.abs(seconds) < 60) return formatter.format(seconds, "second");
   const minutes = Math.round(seconds / 60);
   if (Math.abs(minutes) < 60) return formatter.format(minutes, "minute");

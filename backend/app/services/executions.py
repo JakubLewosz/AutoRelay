@@ -10,13 +10,14 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.core.errors import AppError, not_found
+from app.core.json_values import validate_jsonb_value
 from app.db.base import utc_now
 from app.models.enums import ExecutionStatus, TriggerType
 from app.models.execution import Execution
 from app.models.user import User
 from app.models.workflow import Workflow
 from app.schemas.common import Paginated
-from app.schemas.execution import DashboardSummary, ExecutionResponse
+from app.schemas.execution import DashboardSummary, ExecutionResponse, ExecutionSummary
 
 
 def to_execution_response(execution: Execution) -> ExecutionResponse:
@@ -25,12 +26,32 @@ def to_execution_response(execution: Execution) -> ExecutionResponse:
         workflow_id=execution.workflow_id,
         workflow_name=execution.workflow.name,
         retry_of_execution_id=execution.retry_of_execution_id,
-        status=execution.status,
-        trigger_type=execution.trigger_type,
+        status=ExecutionStatus(execution.status),
+        trigger_type=TriggerType(execution.trigger_type),
         input_payload=execution.input_payload,
         safe_result=execution.safe_result,
         error_code=execution.error_code,
         error_message=execution.error_message,
+        attempt_count=execution.attempt_count,
+        max_attempts=execution.max_attempts,
+        next_attempt_at=execution.next_attempt_at,
+        queued_at=execution.queued_at,
+        started_at=execution.started_at,
+        completed_at=execution.completed_at,
+        duration_ms=execution.duration_ms,
+        created_at=execution.created_at,
+        updated_at=execution.updated_at,
+    )
+
+
+def to_execution_summary(execution: Execution) -> ExecutionSummary:
+    return ExecutionSummary(
+        id=execution.id,
+        workflow_id=execution.workflow_id,
+        workflow_name=execution.workflow.name,
+        retry_of_execution_id=execution.retry_of_execution_id,
+        status=ExecutionStatus(execution.status),
+        trigger_type=TriggerType(execution.trigger_type),
         attempt_count=execution.attempt_count,
         max_attempts=execution.max_attempts,
         next_attempt_at=execution.next_attempt_at,
@@ -52,6 +73,7 @@ async def queue_execution(
     *,
     retry_of_execution_id: UUID | None = None,
 ) -> Execution:
+    validate_jsonb_value(payload)
     execution = Execution(
         workflow_id=workflow.id,
         workflow=workflow,
@@ -96,7 +118,7 @@ async def list_executions(
     page_size: int,
     status: ExecutionStatus | None = None,
     workflow_id: UUID | None = None,
-) -> Paginated[ExecutionResponse]:
+) -> Paginated[ExecutionSummary]:
     filters = [Workflow.user_id == user_id]
     if status is not None:
         filters.append(Execution.status == status.value)
@@ -121,7 +143,7 @@ async def list_executions(
         .limit(page_size)
     )
     return Paginated(
-        items=[to_execution_response(record) for record in records.all()],
+        items=[to_execution_summary(record) for record in records.all()],
         total=total,
         page=page,
         page_size=page_size,
@@ -185,5 +207,5 @@ async def dashboard_summary(user: User, session: AsyncSession) -> DashboardSumma
         executions_last_24_hours=await count_status(),
         succeeded_executions=await count_status(ExecutionStatus.SUCCEEDED),
         failed_executions=await count_status(ExecutionStatus.FAILED),
-        recent_executions=[to_execution_response(item) for item in recent.all()],
+        recent_executions=[to_execution_summary(item) for item in recent.all()],
     )

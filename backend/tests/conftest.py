@@ -32,6 +32,23 @@ class BackendTestContext:
         return httpx.ASGITransport(app=self.app)  # type: ignore[arg-type]
 
 
+def validate_destructive_test_database_url(database_url: str) -> None:
+    parsed = make_url(database_url)
+    backend = parsed.get_backend_name()
+    if backend == "sqlite":
+        if database_url != "sqlite+aiosqlite:///:memory:":
+            raise RuntimeError("SQLite tests must use the in-memory database")
+        return
+    if backend == "postgresql":
+        database_name = parsed.database or ""
+        if database_name.endswith("_test") or database_name.startswith("test_"):
+            return
+        raise RuntimeError("TEST_DATABASE_URL must name an unmistakable test database")
+    raise RuntimeError(
+        "TEST_DATABASE_URL must use in-memory SQLite or a dedicated PostgreSQL test DB"
+    )
+
+
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
@@ -40,11 +57,7 @@ def anyio_backend() -> str:
 @pytest_asyncio.fixture
 async def context() -> AsyncIterator[BackendTestContext]:
     database_url = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    parsed_database_url = make_url(database_url)
-    if parsed_database_url.get_backend_name() == "postgresql":
-        database_name = parsed_database_url.database or ""
-        if not (database_name.endswith("_test") or database_name.startswith("test_")):
-            raise RuntimeError("TEST_DATABASE_URL must name an unmistakable test database")
+    validate_destructive_test_database_url(database_url)
     settings = Settings(
         _env_file=None,
         environment="test",

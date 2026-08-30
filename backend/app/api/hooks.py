@@ -26,7 +26,7 @@ async def receive_webhook(
     session: DBSession,
     settings: AppSettings,
 ) -> QueuedExecutionResponse:
-    workflow = await authenticate_webhook(workflow_id, webhook_token, session)
     payload = await read_json_object(request, settings.webhook_max_payload_bytes)
+    workflow = await authenticate_webhook(workflow_id, webhook_token, session)
     execution = await queue_execution(workflow, payload, TriggerType.WEBHOOK, session, settings)
     return QueuedExecutionResponse(execution_id=execution.id)

@@ -1,14 +1,14 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDuration, formatRelativeTime } from "../../lib/format";
-import type { Execution } from "../../types/execution";
+import type { ExecutionSummary } from "../../types/execution";
 import { StatusBadge } from "../../components/StatusBadge";
 
 export function ExecutionTable({
   executions,
   workflowNames = {},
 }: {
-  executions: Execution[];
+  executions: ExecutionSummary[];
   workflowNames?: Record<string, string>;
 }) {
   return (

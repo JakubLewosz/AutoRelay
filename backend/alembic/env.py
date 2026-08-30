@@ -7,13 +7,14 @@ from alembic import context
 from app import models  # noqa: F401
 from app.core.config import load_settings
 from app.db.base import Base
+from app.db.migration_config import escape_alembic_config_value
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", load_settings().database_url)
+config.set_main_option("sqlalchemy.url", escape_alembic_config_value(load_settings().database_url))
 target_metadata = Base.metadata
 
 

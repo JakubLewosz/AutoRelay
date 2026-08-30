@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, status
 from app.api.dependencies import AppSettings, CSRFProtectedAuth, CurrentAuth, DBSession
 from app.models.enums import ExecutionStatus
 from app.schemas.common import Paginated
-from app.schemas.execution import DashboardSummary, ExecutionResponse
+from app.schemas.execution import DashboardSummary, ExecutionResponse, ExecutionSummary
 from app.services.executions import (
     dashboard_summary,
     get_owned_execution,
@@ -20,7 +20,7 @@ from app.services.executions import (
 router = APIRouter(tags=["Executions"])
 
 
-@router.get("/executions", response_model=Paginated[ExecutionResponse], summary="List executions")
+@router.get("/executions", response_model=Paginated[ExecutionSummary], summary="List executions")
 async def get_executions(
     auth: CurrentAuth,
     session: DBSession,
@@ -28,7 +28,7 @@ async def get_executions(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     execution_status: Annotated[ExecutionStatus | None, Query(alias="status")] = None,
     workflow_id: UUID | None = None,
-) -> Paginated[ExecutionResponse]:
+) -> Paginated[ExecutionSummary]:
     return await list_executions(
         auth.user.id,
         session,

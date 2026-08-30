@@ -1,4 +1,4 @@
-import type { Execution } from "../types/execution";
+import type { ExecutionSummary } from "../types/execution";
 import { apiRequest } from "./client";
 
 export type DashboardSummary = {
@@ -7,7 +7,7 @@ export type DashboardSummary = {
   executions_last_24_hours: number;
   succeeded_executions: number;
   failed_executions: number;
-  recent_executions: Execution[];
+  recent_executions: ExecutionSummary[];
 };
 
 export const dashboardApi = {

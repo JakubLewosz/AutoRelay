@@ -36,8 +36,8 @@ export function ExecutionsPage() {
         : false,
   });
   const workflows = useQuery({
-    queryKey: ["workflows", { page: 1, page_size: 100 }],
-    queryFn: () => workflowsApi.list({ page: 1, page_size: 100 }),
+    queryKey: ["workflow-options"],
+    queryFn: () => workflowsApi.listOptions(),
   });
 
   const setFilter = (key: string, value: string) => {
@@ -115,6 +115,12 @@ export function ExecutionsPage() {
             </div>
           ) : null}
         </div>
+        {workflows.data?.truncated ? (
+          <p className="border-b border-slate-800 px-4 py-2 text-xs text-amber-200/80">
+            The workflow filter shows the first 2,000 workflows. Existing execution rows still show
+            their workflow names.
+          </p>
+        ) : null}
         {executions.data?.items.length ? (
           <>
             <ExecutionTable executions={executions.data.items} workflowNames={workflowNames} />

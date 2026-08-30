@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from urllib.parse import urlsplit
+from uuid import UUID
 
 import httpx
 import pytest
+from app.core.security import SecretBox, hash_secret, new_secret
 from app.db.base import utc_now
 from app.models.session import UserSession
 from app.models.user import User
-from app.models.workflow import WorkflowAction
+from app.models.workflow import Workflow, WorkflowAction
 from sqlalchemy import select
 from tests.conftest import BackendTestContext, discord_workflow_payload, register
 
@@ -121,6 +124,9 @@ async def test_csrf_workflow_crud_redaction_and_encryption(
     listing = await client.get("/api/v1/workflows?page=1&page_size=10")
     assert listing.json()["total"] == 1
     assert listing.json()["pages"] == 1
+    summary = listing.json()["items"][0]
+    assert "webhook_url" not in summary
+    assert summary["action"] == {"action_type": "DISCORD_WEBHOOK"}
 
 
 @pytest.mark.asyncio
@@ -145,6 +151,12 @@ async def test_workflow_and_execution_ownership_isolation(context: BackendTestCo
         )
         execution_id = queued.json()["execution_id"]
 
+        own_listing = await first.get("/api/v1/executions")
+        execution_summary = own_listing.json()["items"][0]
+        assert "input_payload" not in execution_summary
+        assert "safe_result" not in execution_summary
+        assert "error_message" not in execution_summary
+
         assert (await second.get(f"/api/v1/workflows/{workflow['id']}")).status_code == 404
         assert (await second.get(f"/api/v1/executions/{execution_id}")).status_code == 404
 
@@ -166,11 +178,20 @@ async def test_webhook_rotation_json_and_size_validation(
 
     not_json = await client.post(old_path, content="hello", headers={"Content-Type": "text/plain"})
     assert not_json.status_code == 415
-    nonstandard_json = await client.post(
-        old_path, content=b'{"value": NaN}', headers={"Content-Type": "application/json"}
-    )
-    assert nonstandard_json.status_code == 400
-    assert nonstandard_json.json()["error"]["code"] == "invalid_json"
+    deep_json = b'{"value":' + (b"[" * 70) + b"0" + (b"]" * 70) + b"}"
+    for invalid_body in (
+        b'{"value": NaN}',
+        b'{"value": 1e400}',
+        b'{"value": -1e400}',
+        b'{"value": "\\u0000"}',
+        b'{"value": "\\ud800"}',
+        deep_json,
+    ):
+        invalid_json = await client.post(
+            old_path, content=invalid_body, headers={"Content-Type": "application/json"}
+        )
+        assert invalid_json.status_code == 400
+        assert invalid_json.json()["error"]["code"] == "invalid_json"
     too_large = await client.post(old_path, json={"value": "x" * 1100})
     assert too_large.status_code == 413
 
@@ -196,3 +217,55 @@ async def test_health_and_structured_validation_errors(client: httpx.AsyncClient
     assert response.json()["error"]["code"] == "validation_error"
     assert response.headers["X-Request-ID"]
     assert '"input":"short"' not in response.text
+
+
+@pytest.mark.asyncio
+async def test_workflow_rejects_database_unsafe_text(client: httpx.AsyncClient) -> None:
+    csrf = await register(client)
+    payload = discord_workflow_payload(name="unsafe\x00name")
+    response = await client.post("/api/v1/workflows", json=payload, headers={"X-CSRF-Token": csrf})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.postgres
+async def test_postgres_workflow_lock_serializes_rotation_and_hook_acceptance(
+    client: httpx.AsyncClient, context: BackendTestContext
+) -> None:
+    if context.engine.dialect.name != "postgresql":
+        pytest.skip("workflow row lock behavior requires PostgreSQL")
+    csrf = await register(client)
+    created = await client.post(
+        "/api/v1/workflows",
+        json=discord_workflow_payload(),
+        headers={"X-CSRF-Token": csrf},
+    )
+    workflow_id = created.json()["id"]
+    old_path = urlsplit(created.json()["webhook_url"]).path
+
+    async with context.factory() as locking_session:
+        async with locking_session.begin():
+            locked = await locking_session.scalar(
+                select(Workflow).where(Workflow.id == UUID(workflow_id)).with_for_update()
+            )
+            assert locked is not None
+            waiting_hook = asyncio.create_task(client.post(old_path, json={"event": "old"}))
+            await asyncio.sleep(0.05)
+            busy_rotation = await client.post(
+                f"/api/v1/workflows/{workflow_id}/rotate-token",
+                headers={"X-CSRF-Token": csrf},
+            )
+            assert busy_rotation.status_code == 409
+            replacement = new_secret()
+            locked.webhook_token_hash = hash_secret(replacement)
+            locked.webhook_token_encrypted = SecretBox(
+                context.settings.fernet_key.get_secret_value()
+            ).encrypt_text(replacement)
+
+    assert (await waiting_hook).status_code == 404
+    successful_rotation = await client.post(
+        f"/api/v1/workflows/{workflow_id}/rotate-token",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert successful_rotation.status_code == 200

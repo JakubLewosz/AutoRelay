@@ -98,10 +98,12 @@ async def _execute_action_once(
     else:
         target_url = validate_discord_webhook_url(str(config["webhook_url"]))
         request_json = {
-            "content": render_discord_template(str(config["message_template"]), payload)
+            "content": render_discord_template(str(config["message_template"]), payload),
+            "allowed_mentions": {"parse": []},
         }
         headers = {}
     headers["X-AutoRelay-Execution-ID"] = str(execution_id)
+    headers["Accept-Encoding"] = "identity"
 
     owns_client = client is None
     if client is None:
@@ -120,7 +122,7 @@ async def _execute_action_once(
             status_code = response.status_code
             response_bytes = 0
             response_truncated = False
-            async for chunk in response.aiter_bytes():
+            async for chunk in response.aiter_raw():
                 remaining = _MAX_RESPONSE_BYTES - response_bytes
                 if len(chunk) > remaining:
                     response_bytes = _MAX_RESPONSE_BYTES

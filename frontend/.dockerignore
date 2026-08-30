@@ -4,4 +4,9 @@ coverage
 playwright-report
 test-results
 .git
+.env
+.env.*
+!.env.example
+.npmrc
 *.local
+npm-debug.log*

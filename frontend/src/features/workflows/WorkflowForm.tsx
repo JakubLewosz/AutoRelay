@@ -205,7 +205,9 @@ export function WorkflowForm({
                           ? "1000"
                           : "approved"
                       }
-                      hint="Numbers are preserved for numeric comparisons; JSON arrays are supported for contains."
+                      hint={
+                        'Use JSON quotes for numeric-looking text ("123") or an empty string (""); arrays are supported for contains.'
+                      }
                       error={errors.comparisonValue?.message}
                       {...register("comparisonValue")}
                     />

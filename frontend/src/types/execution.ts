@@ -22,3 +22,8 @@ export type Execution = {
   created_at: string;
   updated_at: string;
 };
+
+export type ExecutionSummary = Omit<
+  Execution,
+  "input_payload" | "safe_result" | "error_code" | "error_message"
+>;

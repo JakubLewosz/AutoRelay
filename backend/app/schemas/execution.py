@@ -32,6 +32,24 @@ class ExecutionResponse(APIModel):
     updated_at: datetime
 
 
+class ExecutionSummary(APIModel):
+    id: UUID
+    workflow_id: UUID
+    workflow_name: str
+    retry_of_execution_id: UUID | None
+    status: ExecutionStatus
+    trigger_type: TriggerType
+    attempt_count: int
+    max_attempts: int
+    next_attempt_at: datetime | None
+    queued_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    duration_ms: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class QueuedExecutionResponse(APIModel):
     execution_id: UUID
     status: ExecutionStatus = ExecutionStatus.QUEUED
@@ -43,4 +61,4 @@ class DashboardSummary(APIModel):
     executions_last_24_hours: int = Field(ge=0)
     succeeded_executions: int = Field(ge=0)
     failed_executions: int = Field(ge=0)
-    recent_executions: list[ExecutionResponse]
+    recent_executions: list[ExecutionSummary]

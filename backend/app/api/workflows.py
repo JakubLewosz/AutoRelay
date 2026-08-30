@@ -12,6 +12,7 @@ from app.schemas.execution import QueuedExecutionResponse
 from app.schemas.workflow import (
     WorkflowCreate,
     WorkflowResponse,
+    WorkflowSummary,
     WorkflowTestRequest,
     WorkflowUpdate,
 )
@@ -30,15 +31,14 @@ from app.services.workflows import (
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
 
-@router.get("", response_model=Paginated[WorkflowResponse], summary="List workflows")
+@router.get("", response_model=Paginated[WorkflowSummary], summary="List workflows")
 async def get_workflows(
     auth: CurrentAuth,
     session: DBSession,
-    settings: AppSettings,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
-) -> Paginated[WorkflowResponse]:
-    return await list_workflows(auth.user.id, session, settings, page, page_size)
+) -> Paginated[WorkflowSummary]:
+    return await list_workflows(auth.user.id, session, page, page_size)
 
 
 @router.post(
@@ -73,7 +73,9 @@ async def patch_workflow(
     session: DBSession,
     settings: AppSettings,
 ) -> WorkflowResponse:
-    workflow = await get_owned_workflow(workflow_id, auth.user.id, session)
+    workflow = await get_owned_workflow(
+        workflow_id, auth.user.id, session, for_update=True, nowait=True
+    )
     workflow = await update_workflow(workflow, data, session, settings)
     return to_workflow_response(workflow, settings)
 
@@ -88,7 +90,9 @@ async def patch_workflow(
 async def remove_workflow(
     workflow_id: UUID, auth: CSRFProtectedAuth, session: DBSession
 ) -> Response:
-    workflow = await get_owned_workflow(workflow_id, auth.user.id, session)
+    workflow = await get_owned_workflow(
+        workflow_id, auth.user.id, session, for_update=True, nowait=True
+    )
     await delete_workflow(workflow, session)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -104,7 +108,9 @@ async def rotate_token(
     session: DBSession,
     settings: AppSettings,
 ) -> WorkflowResponse:
-    workflow = await get_owned_workflow(workflow_id, auth.user.id, session)
+    workflow = await get_owned_workflow(
+        workflow_id, auth.user.id, session, for_update=True, nowait=True
+    )
     workflow = await rotate_webhook_token(workflow, session, settings)
     return to_workflow_response(workflow, settings)
 

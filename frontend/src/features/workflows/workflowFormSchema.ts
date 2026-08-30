@@ -110,6 +110,27 @@ export function makeWorkflowFormSchema(preservedActionType?: "HTTP_POST" | "DISC
           });
         }
         if (
+          !["exists", "does_not_exist"].includes(values.operator) &&
+          values.comparisonValue.trim() === "null"
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["comparisonValue"],
+            message: "Comparison values cannot be null.",
+          });
+        }
+        if (values.comparisonValue.trim().startsWith('"')) {
+          try {
+            if (typeof JSON.parse(values.comparisonValue.trim()) !== "string") throw new Error();
+          } catch {
+            context.addIssue({
+              code: "custom",
+              path: ["comparisonValue"],
+              message: 'Use valid JSON string syntax, for example "123" or "".',
+            });
+          }
+        }
+        if (
           ["greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal"].includes(
             values.operator,
           ) &&
@@ -191,19 +212,11 @@ function parseComparison(value: string, operator: ConditionOperator): unknown {
   )
     return Number(value);
   const trimmed = value.trim();
-  if (
-    trimmed.startsWith("[") ||
-    trimmed.startsWith("{") ||
-    ["true", "false", "null"].includes(trimmed) ||
-    /^-?\d+(\.\d+)?$/.test(trimmed)
-  ) {
-    try {
-      return JSON.parse(trimmed) as unknown;
-    } catch {
-      return value;
-    }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return trimmed;
   }
-  return value;
 }
 
 export function toWorkflowInput(values: WorkflowFormValues): WorkflowInput {
@@ -254,11 +267,7 @@ export function workflowFormDefaults(workflow?: Workflow): WorkflowFormValues {
     fieldPath: workflow?.condition?.field_path ?? "",
     operator: workflow?.condition?.operator ?? "equals",
     comparisonValue:
-      comparison === undefined || comparison === null
-        ? ""
-        : typeof comparison === "string"
-          ? comparison
-          : JSON.stringify(comparison),
+      comparison === undefined || comparison === null ? "" : JSON.stringify(comparison),
     actionType: workflow?.action.action_type ?? "HTTP_POST",
     targetUrl: workflow ? "" : (config.target_url ?? ""),
     headersJson: workflow ? "" : headers ? JSON.stringify(headers, null, 2) : "",

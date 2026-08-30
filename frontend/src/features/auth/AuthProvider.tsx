@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useEffect, type PropsWithChildren } from "react";
 import { authApi } from "../../api/auth";
-import { ApiError, setCsrfToken } from "../../api/client";
+import { ApiError, setCsrfToken, setUnauthorizedHandler } from "../../api/client";
 import type { AuthCredentials, AuthResponse, User } from "../../types/auth";
 
 type AuthContextValue = {
@@ -24,8 +24,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     queryFn: authApi.me,
     retry: false,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
     throwOnError: false,
   });
+
+  const clearLocalSession = useCallback(() => {
+    setCsrfToken(null);
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
+    queryClient.getMutationCache().clear();
+    queryClient.setQueryData(authQueryKey, null);
+  }, [queryClient]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(clearLocalSession);
+    return () => setUnauthorizedHandler(null);
+  }, [clearLocalSession]);
 
   useEffect(() => {
     setCsrfToken(authQuery.data?.csrf_token ?? null);
@@ -35,6 +49,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     queryClient.removeQueries({
       predicate: (query) => query.queryKey[0] !== "auth",
     });
+    queryClient.getMutationCache().clear();
     setCsrfToken(response.csrf_token);
     queryClient.setQueryData(authQueryKey, response);
     return response;
@@ -50,15 +65,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   });
   const logoutMutation = useMutation({
     mutationFn: authApi.logout,
-    onSuccess: () => {
-      setCsrfToken(null);
-      queryClient.clear();
-      queryClient.setQueryData(authQueryKey, null);
-    },
+    onSettled: clearLocalSession,
   });
 
   const unauthenticated =
     authQuery.error instanceof ApiError && [401, 403].includes(authQuery.error.status);
+
+  useEffect(() => {
+    if (unauthenticated) clearLocalSession();
+  }, [clearLocalSession, unauthenticated]);
   const user = unauthenticated ? null : (authQuery.data?.user ?? null);
 
   return (
